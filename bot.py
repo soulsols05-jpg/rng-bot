@@ -4,10 +4,50 @@ from discord import app_commands
 import random
 import os
 import json
+import base64
 
-# Токен берётся из переменной окружения (безопасно)
+# Токен
 TOKEN = os.environ.get("TOKEN")
 SAVE_FILE = "rng_save.json"
+
+# GitHub save
+GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
+GITHUB_REPO = "soulsols05-jpg/rng-bot"
+GITHUB_PATH = "rng_save.json"
+
+def save_to_github():
+    if not GITHUB_TOKEN:
+        return
+    try:
+        import requests
+        with open(SAVE_FILE, "r") as f:
+            content = f.read()
+        encoded = base64.b64encode(content.encode()).decode()
+
+        # Получаем sha файла если он есть
+        url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{GITHUB_PATH}"
+        headers = {"Authorization": f"token {GITHUB_TOKEN}"}
+        
+        try:
+            resp = requests.get(url, headers=headers)
+            if resp.status_code == 200:
+                sha = resp.json()["sha"]
+            else:
+                sha = None
+        except:
+            sha = None
+
+        # Загружаем файл
+        data = {
+            "message": "auto save",
+            "content": encoded,
+        }
+        if sha:
+            data["sha"] = sha
+        
+        requests.put(url, headers=headers, json=data)
+    except:
+        pass  # Если не получилось сохранить в GitHub — просто пропускаем
 
 # Discord embed colours
 COLORS = {
@@ -19,7 +59,6 @@ COLORS = {
     "BRONZE": 0xCD7F32, "DARK_GREEN": 0x006400, "MOON": 0xF0F0F0,
 }
 
-# ── AURAS ──────────────────────────────────
 auras = [
     {"name": "Common", "one_in": 3, "color": "GRAY", "description": "That common is very common."},
     {"name": "Cool", "one_in": 6, "color": "GREEN", "description": "That cool is very cool."},
@@ -33,57 +72,42 @@ auras = [
     {"name": "Bronze", "one_in": 256, "color": "BRONZE", "description": "Least expensive material."},
     {"name": "Paint", "one_in": 512, "color": "WHITE", "description": "That kid played with paint bruh"},
     {"name": "Gold", "one_in": 673, "color": "GOLD", "description": "Very expensive material!"},
-    {"name": "Fissure", "one_in": 724, "color": "BLUE", "biome": "Calamity"},
     {"name": "Water", "one_in": 825, "color": "LIGHT_BLUE", "description": "Its time to drink water!", "biome": "Rainy"},
-    {"name": "Voxel", "one_in": 937, "color": "GREEN"},
     {"name": "Vortex", "one_in": 1100, "color": "PURPLE", "description": "How did you steal a vortex from space?", "biome": "Cosmic"},
     {"name": "Starfall", "one_in": 2750, "color": "MAGENTA", "description": "The star is falling, Quick! Make a wish!", "biome": "Cosmic"},
     {"name": "Hate", "one_in": 3300, "color": "DARK_RED", "description": "Hated.", "biome": "Calamity"},
     {"name": "Windswept", "one_in": 3530, "color": "CYAN", "description": "Breezing winds sweep through your body, refreshing you.", "biome": "Windy"},
-    {"name": "Static", "one_in": 4040, "color": "GRAY", "biome": "FATAL ERROR"},
-    {"name": "Error", "one_in": 11111111, "color": "RED", "description": "[FATAL ERROR] exclusive.", "biome": "FATAL ERROR", "no_boost": True},
     {"name": "Shield", "one_in": 4753, "color": "BLUE", "description": "Hes protected!"},
     {"name": "Portal Master", "one_in": 5000, "color": "WHITE"},
-    {"name": "Empower", "one_in": 5005, "color": "WHITE"},
     {"name": "Bloodshed", "one_in": 6666, "color": "DARK_RED", "description": "The blood.", "biome": "Crimson"},
     {"name": "Hacker", "one_in": 7777, "color": "GREEN", "description": "Binary being of the matrix world.", "biome": "Matrix"},
     {"name": "Spectral", "one_in": 8192, "color": "CYAN", "description": "The spinning souls.", "biome": "Foggy"},
     {"name": "Vortex : Blackhole", "one_in": 11100, "color": "PURPLE", "description": "It devours everything in its path.", "biome": "Cosmic"},
     {"name": "Moonstone", "one_in": 14050, "color": "MOON", "description": "A fragment of the silent moon."},
-    {"name": "Teacup", "one_in": 16000, "color": "ORANGE", "description": "Submines favourite drink: Tea."},
     {"name": "Confusion", "one_in": 17000, "color": "WHITE", "description": "Im so confused."},
-    {"name": "Shade", "one_in": 19000, "color": "GRAY", "description": "Pure darkness.", "biome": "Calamity"},
-    {"name": "Abnormal", "one_in": 24000, "color": "CYAN"},
     {"name": "RUNES", "one_in": 30000, "color": "PINK", "description": "runes wooooooo creepy old wooo"},
     {"name": "Divine", "one_in": 32768, "color": "YELLOW", "description": "The divine being."},
     {"name": "Absolute", "one_in": 50000, "color": "ORANGE", "description": "RRRRRRAAHHHHHHHHHHHHHH!!!"},
-    {"name": "Azure", "one_in": 60000, "color": "BLUE"},
     {"name": "Hacker : Virtual", "one_in": 77777, "color": "LIGHT_BLUE", "description": "Powerful binary being.", "biome": "Matrix"},
     {"name": "Genesis", "one_in": 100000, "color": "PINK", "description": "This auras element is unknown."},
     {"name": "Tornado", "one_in": 200000, "color": "GRAY", "description": "2 gust of winds spinning eternally."},
     {"name": "Ethereal", "one_in": 400000, "color": "PURPLE", "description": "Bruh"},
     {"name": "Claymore", "one_in": 596000, "color": "ORANGE", "description": "A warrior"},
     {"name": "Spectral : Blessed", "one_in": 600000, "color": "BLUE", "biome": "Foggy"},
-    {"name": "Residue", "one_in": 675435, "color": "RED", "biome": "Crimson"},
     {"name": "Vines", "one_in": 730000, "color": "GREEN", "biome": "Jungle"},
     {"name": "Exotic Melody", "one_in": 888000, "color": "RED", "description": "I have very musical mind!"},
     {"name": "Genesis : Omega", "one_in": 1000000, "color": "DARK_RED"},
-    {"name": "Azure : Khalira", "one_in": 1600000, "color": "BLUE"},
     {"name": "Frostbite", "one_in": 1948090, "color": "LIGHT_BLUE", "description": "The arm is frozen.", "biome": "Snowy"},
-    {"name": "Voxel : Platformer", "one_in": 1995400, "color": "GREEN"},
     {"name": "Cybernetic", "one_in": 2400000, "color": "BLUE", "description": "Hologramms"},
     {"name": "Resilience", "one_in": 4000000, "color": "WHITE"},
     {"name": "Cataclysm", "one_in": 5000000, "color": "GRAY", "biome": "Calamity"},
-    {"name": "Life Force", "one_in": 6000000, "color": "RED"},
     {"name": "Eternal", "one_in": 7500000, "color": "PINK"},
     {"name": "Snowfall", "one_in": 7920000, "color": "LIGHT_BLUE", "biome": "Snowy"},
     {"name": "OVERSEER", "one_in": 9240000, "color": "GREEN", "biome": "Calamity"},
     {"name": "lost", "one_in": 9606060, "color": "GRAY", "biome": "Foggy"},
     {"name": "Serenity", "one_in": 10000000, "color": "ORANGE"},
     {"name": "Nightfall", "one_in": 11000000, "color": "PURPLE", "biome": "Night"},
-    {"name": "Arcane Guardian", "one_in": 14000000, "color": "BLUE"},
     {"name": "Starfall : Event Horizon", "one_in": 20000000, "color": "ORANGE", "biome": "Cosmic"},
-    {"name": "RUNES : Time Limit", "one_in": 23000000, "color": "ORANGE"},
     {"name": "foregoing", "one_in": 23000000, "color": "CYAN", "biome": "Rainy"},
     {"name": "Omnipotent", "one_in": 27000000, "color": "BLUE", "biome": "Calamity"},
     {"name": "Snowfall : Blizzard", "one_in": 38360000, "color": "LIGHT_BLUE", "biome": "Snowy"},
@@ -109,12 +133,12 @@ auras = [
 ]
 auras.sort(key=lambda x: x["one_in"])
 
-# ── GAME DATA ──────────────────────────────
 game_data = {}
 
 def save_all():
     with open(SAVE_FILE, "w") as f:
         json.dump(game_data, f)
+    save_to_github()
 
 def load_all():
     global game_data
@@ -139,7 +163,6 @@ def get_user_data(user_id: str):
         game_data[user_id] = {"rolls": 0, "inventory": {}, "stat": 0}
     return game_data[user_id]
 
-# ── BOT SETUP ──────────────────────────────
 intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
@@ -153,7 +176,6 @@ async def on_ready():
     except Exception as e:
         print(f"❌ Sync failed: {e}")
 
-# ── /roll ──────────────────────────────────
 @bot.tree.command(name="roll", description="Roll for a random aura")
 async def slash_roll(interaction: discord.Interaction):
     uid = str(interaction.user.id)
@@ -187,7 +209,6 @@ async def slash_roll(interaction: discord.Interaction):
     embed.add_field(name="Rolls", value=str(data["rolls"]), inline=True)
     await interaction.response.send_message(embed=embed)
 
-# ── /inv ───────────────────────────────────
 @bot.tree.command(name="inv", description="Show your aura inventory")
 async def slash_inv(interaction: discord.Interaction):
     uid = str(interaction.user.id)
@@ -203,7 +224,6 @@ async def slash_inv(interaction: discord.Interaction):
     embed.set_footer(text=f"Rolls: {data['rolls']:,} | Stat: {format_stat(data.get('stat', 0))}")
     await interaction.response.send_message(embed=embed)
 
-# ── /lb ────────────────────────────────────
 @bot.tree.command(name="lb", description="Leaderboard by Stat Collected")
 async def slash_lb(interaction: discord.Interaction):
     if not game_data:
@@ -217,7 +237,6 @@ async def slash_lb(interaction: discord.Interaction):
         embed.add_field(name=f"{i+1}. {name}", value=f"Stat: {format_stat(udata.get('stat', 0))} | Rolls: {udata.get('rolls', 0):,}", inline=False)
     await interaction.response.send_message(embed=embed)
 
-# ── /achievements ──────────────────────────
 @bot.tree.command(name="achievements", description="View your achievements")
 async def slash_achievements(interaction: discord.Interaction):
     uid = str(interaction.user.id)
@@ -242,7 +261,6 @@ async def slash_achievements(interaction: discord.Interaction):
         embed.add_field(name=ach["name"], value=f"{ach['desc']} — {status}", inline=False)
     await interaction.response.send_message(embed=embed)
 
-# ── /help ──────────────────────────────────
 @bot.tree.command(name="help", description="List all commands")
 async def slash_help(interaction: discord.Interaction):
     embed = discord.Embed(title="📋 Commands", color=0x00FF00)
@@ -252,7 +270,6 @@ async def slash_help(interaction: discord.Interaction):
     embed.add_field(name="/achievements", value="Achievements", inline=False)
     await interaction.response.send_message(embed=embed)
 
-# ── START ──────────────────────────────────
 if TOKEN is None:
     print("❌ TOKEN not found! Set it as an environment variable.")
 else:
