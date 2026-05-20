@@ -6,11 +6,9 @@ import os
 import json
 import base64
 
-# Токен
 TOKEN = os.environ.get("TOKEN")
 SAVE_FILE = "rng_save.json"
 
-# GitHub save
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
 GITHUB_REPO = "soulsols05-jpg/rng-bot"
 GITHUB_PATH = "rng_save.json"
@@ -23,33 +21,20 @@ def save_to_github():
         with open(SAVE_FILE, "r") as f:
             content = f.read()
         encoded = base64.b64encode(content.encode()).decode()
-
-        # Получаем sha файла если он есть
         url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{GITHUB_PATH}"
         headers = {"Authorization": f"token {GITHUB_TOKEN}"}
-        
         try:
             resp = requests.get(url, headers=headers)
-            if resp.status_code == 200:
-                sha = resp.json()["sha"]
-            else:
-                sha = None
+            sha = resp.json()["sha"] if resp.status_code == 200 else None
         except:
             sha = None
-
-        # Загружаем файл
-        data = {
-            "message": "auto save",
-            "content": encoded,
-        }
+        data = {"message": "auto save", "content": encoded}
         if sha:
             data["sha"] = sha
-        
         requests.put(url, headers=headers, json=data)
     except:
-        pass  # Если не получилось сохранить в GitHub — просто пропускаем
+        pass
 
-# Discord embed colours
 COLORS = {
     "GRAY": 0x808080, "GREEN": 0x00FF00, "PURPLE": 0x800080,
     "YELLOW": 0xFFFF00, "ORANGE": 0xFF8800, "RED": 0xFF0000,
@@ -172,9 +157,9 @@ async def on_ready():
     load_all()
     try:
         synced = await bot.tree.sync()
-        print(f"✅ {bot.user} is online! Synced {len(synced)} commands.")
+        print(f"Bot online! Synced {len(synced)} commands.")
     except Exception as e:
-        print(f"❌ Sync failed: {e}")
+        print(f"Sync failed: {e}")
 
 @bot.tree.command(name="roll", description="Roll for a random aura")
 async def slash_roll(interaction: discord.Interaction):
@@ -215,9 +200,9 @@ async def slash_inv(interaction: discord.Interaction):
     data = get_user_data(uid)
     inv = data.get("inventory", {})
     if not inv:
-        await interaction.response.send_message("Your inventory is empty. Use `/roll` first!")
+        await interaction.response.send_message("Your inventory is empty. Use /roll first!")
         return
-    embed = discord.Embed(title="🎒 Inventory", color=0x00FF00)
+    embed = discord.Embed(title="Inventory", color=0x00FF00)
     for aura in auras:
         if aura["name"] in inv:
             embed.add_field(name=aura["name"], value=f"x{inv[aura['name']]} (1/{aura['one_in']:,})", inline=True)
@@ -229,12 +214,19 @@ async def slash_lb(interaction: discord.Interaction):
     if not game_data:
         await interaction.response.send_message("Nobody has played yet!")
         return
-    sorted_u = sorted(game_data.items(), key=lambda x: x[1].get("stat", 0), reverse=True)
-    embed = discord.Embed(title="🏆 Leaderboard", color=0xFFD700)
-    for i, (uid, udata) in enumerate(sorted_u[:10]):
-        user = await bot.fetch_user(int(uid))
-        name = user.name if user else "Unknown"
-        embed.add_field(name=f"{i+1}. {name}", value=f"Stat: {format_stat(udata.get('stat', 0))} | Rolls: {udata.get('rolls', 0):,}", inline=False)
+    sorted_u = sorted(game_data.items(), key=lambda x: x[1].get("stat", 0), reverse=True)[:10]
+    embed = discord.Embed(title="Leaderboard", color=0xFFD700)
+    for i, (uid, udata) in enumerate(sorted_u):
+        stat = udata.get("stat", 0)
+        rolls = udata.get("rolls", 0)
+        user = bot.get_user(int(uid))
+        if user is None:
+            try:
+                user = await bot.fetch_user(int(uid))
+            except:
+                user = None
+        name = user.name if user else f"Unknown ({uid[:6]}...)"
+        embed.add_field(name=f"{i+1}. {name}", value=f"Stat: {format_stat(stat)} | Rolls: {rolls:,}", inline=False)
     await interaction.response.send_message(embed=embed)
 
 @bot.tree.command(name="achievements", description="View your achievements")
@@ -251,19 +243,19 @@ async def slash_achievements(interaction: discord.Interaction):
         {"name": "Millionaire", "desc": "Reach 10,000,000 Stat.", "target": 10000000, "type": "stat"},
         {"name": "Dragon's Hoard", "desc": "Reach 100,000,000 Stat.", "target": 100000000, "type": "stat"},
     ]
-    embed = discord.Embed(title="🏅 Achievements", color=0x00FF00)
+    embed = discord.Embed(title="Achievements", color=0x00FF00)
     rolls = data["rolls"]
     stat = data["stat"]
     for ach in ach_list:
         target = ach["target"]
         current = rolls if ach["type"] == "rolls" else stat
-        status = "✅" if current >= target else f"❌ ({format_stat(current)}/{format_stat(target)})"
-        embed.add_field(name=ach["name"], value=f"{ach['desc']} — {status}", inline=False)
+        status = "DONE" if current >= target else f"({format_stat(current)}/{format_stat(target)})"
+        embed.add_field(name=ach["name"], value=f"{ach['desc']} -- {status}", inline=False)
     await interaction.response.send_message(embed=embed)
 
 @bot.tree.command(name="help", description="List all commands")
 async def slash_help(interaction: discord.Interaction):
-    embed = discord.Embed(title="📋 Commands", color=0x00FF00)
+    embed = discord.Embed(title="Commands", color=0x00FF00)
     embed.add_field(name="/roll", value="Roll for an aura", inline=False)
     embed.add_field(name="/inv", value="Show inventory", inline=False)
     embed.add_field(name="/lb", value="Leaderboard", inline=False)
@@ -271,6 +263,6 @@ async def slash_help(interaction: discord.Interaction):
     await interaction.response.send_message(embed=embed)
 
 if TOKEN is None:
-    print("❌ TOKEN not found! Set it as an environment variable.")
+    print("TOKEN not found! Set it as an environment variable.")
 else:
     bot.run(TOKEN)
